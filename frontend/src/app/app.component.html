@@ -1,0 +1,149 @@
+<div class="container">
+  <h1>{{ title }}</h1>
+
+  <div class="description">
+    <h2>📖 このデモの目的</h2>
+    <p>
+      <strong>フロントエンドにエラーの原因を探られないようにする</strong>ための
+      実践的なエラーハンドリングのデモです。
+    </p>
+
+    <h3>🔒 セキュリティ戦略</h3>
+    <div class="strategy">
+      <div class="strategy-box masked">
+        <h4>🚫 隠匿するエラー（500に変換）</h4>
+        <ul>
+          <li><strong>400 Bad Request</strong> - バリデーションルールが露出</li>
+          <li><strong>409 Conflict</strong> - データ制約が露出</li>
+          <li><strong>422 Unprocessable</strong> - ビジネスルールが露出</li>
+        </ul>
+        <p class="note">→ 内部実装が推測されるので隠匿</p>
+      </div>
+
+      <div class="strategy-box allowed">
+        <h4>✅ そのまま返すエラー</h4>
+        <ul>
+          <li><strong>401 Unauthorized</strong> - ログイン画面への誘導に必要</li>
+          <li><strong>403 Forbidden</strong> - 権限エラーの明示に必要</li>
+          <li><strong>404 Not Found</strong> - リソース不在（攻撃材料にならない）</li>
+        </ul>
+        <p class="note">→ クライアント側の適切な処理に必要</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h3>🧪 各エラーパターンをテスト</h3>
+
+    <div class="button-group">
+      <h4>成功パターン</h4>
+      <button class="btn-success" (click)="callSuccessApi()" [disabled]="loading">
+        ✅ 成功するAPI
+      </button>
+    </div>
+
+    <div class="button-group">
+      <h4>隠匿されるエラー（500に変換）</h4>
+      <button class="btn-masked" (click)="call400()" [disabled]="loading">
+        400 - バリデーションエラー → <strong>500</strong>
+      </button>
+      <button class="btn-masked" (click)="call409()" [disabled]="loading">
+        409 - 競合エラー → <strong>500</strong>
+      </button>
+      <button class="btn-masked" (click)="call422()" [disabled]="loading">
+        422 - ビジネスロジックエラー → <strong>500</strong>
+      </button>
+    </div>
+
+    <div class="button-group">
+      <h4>そのまま返るエラー</h4>
+      <button class="btn-allowed" (click)="call401()" [disabled]="loading">
+        401 - 未認証 → <strong>401</strong>
+      </button>
+      <button class="btn-allowed" (click)="call403()" [disabled]="loading">
+        403 - 権限なし → <strong>403</strong>
+      </button>
+      <button class="btn-allowed" (click)="call404()" [disabled]="loading">
+        404 - Not Found → <strong>404</strong>
+      </button>
+    </div>
+
+    <div class="button-group">
+      <button class="btn-reset" (click)="reset()">
+        🔄 リセット
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="loading">
+    処理中...
+  </div>
+
+  <div *ngIf="errorResponse" class="error-box">
+    <h3>❌ エラーレスポンス</h3>
+    <div class="info-row">
+      <strong>ステータスコード:</strong>
+      <span class="status-code" [class.status-500]="errorResponse.status === 500">
+        {{ errorResponse.status }}
+      </span>
+    </div>
+    <div class="info-row">
+      <strong>ステータステキスト:</strong>
+      {{ errorResponse.statusText }}
+    </div>
+    <div class="info-row">
+      <strong>メッセージ:</strong>
+      {{ errorResponse.message }}
+    </div>
+    <div class="json-display">
+      <strong>完全なエラーオブジェクト:</strong>
+      <pre>{{ errorResponse | json }}</pre>
+    </div>
+    <div *ngIf="errorResponse.status === 500" class="security-note">
+      🔒 <strong>セキュリティ効果:</strong> 元のエラー詳細（バリデーションルール、データ制約など）は隠匿されています。
+      サーバー側のログには記録されますが、クライアントには見えません。
+    </div>
+    <div *ngIf="errorResponse.status !== 500" class="allowed-note">
+      ✅ <strong>このエラーはそのまま返されています:</strong> クライアント側で適切な処理（ログイン画面への誘導、権限エラー表示など）を行うために必要です。
+    </div>
+  </div>
+
+  <div *ngIf="successResponse" class="success-box">
+    <h3>✅ 成功レスポンス</h3>
+    <pre>{{ successResponse | json }}</pre>
+  </div>
+
+  <div class="explanation">
+    <h2>💡 実装の仕組み</h2>
+
+    <h3>🛡️ セキュリティインターセプター</h3>
+    <p><code>secure-error-masking.interceptor.ts</code></p>
+    <pre class="code-block">// 隠匿すべきエラーかどうかを判定
+if (status &gt;= 400 &amp;&amp; status &lt; 500) &#123;
+  // 401, 403, 404 は除外（クライアント側の動作に必要）
+  if (![401, 403, 404].includes(status)) &#123;
+    // 500に変換して詳細情報を隠匿
+    return new InternalServerErrorException(&#123;
+      statusCode: 500,
+      message: 'サーバーエラーが発生しました',
+    &#125;);
+  &#125;
+&#125;</pre>
+
+    <h3>📋 処理フロー</h3>
+    <ol>
+      <li>コントローラで400, 409, 422などのエラーが発生</li>
+      <li>インターセプターが自動的にキャッチ</li>
+      <li>元のエラー詳細をサーバー側ログに記録（障害調査用）</li>
+      <li>401, 403, 404以外の4xx系エラーを500に変換</li>
+      <li>クライアントには一般的なエラーメッセージのみ返却</li>
+    </ol>
+
+    <h3>🎯 実務での応用</h3>
+    <ul>
+      <li>環境変数で本番/開発を切り替え（開発時は詳細表示）</li>
+      <li>ログサービスへの送信（Sentry, CloudWatchなど）</li>
+      <li>エラーIDを発行してユーザーに提示（サポート対応時の追跡用）</li>
+    </ul>
+  </div>
+</div>
