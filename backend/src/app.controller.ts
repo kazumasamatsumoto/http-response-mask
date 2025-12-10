@@ -7,7 +7,10 @@ import {
   NotFoundException,
   ConflictException,
   UnprocessableEntityException,
+  UseInterceptors,
 } from '@nestjs/common';
+import { RequestLoggingInterceptor } from './request-logging.interceptor';
+import { ResponseLoggingInterceptor } from './response-logging.interceptor';
 
 @Controller('api')
 export class AppController {
@@ -16,6 +19,18 @@ export class AppController {
     return {
       message: '成功しました',
       data: { result: 'OK' },
+    };
+  }
+
+  // === インターセプター分離のテスト ===
+
+  @Get('interceptor-test')
+  @UseInterceptors(RequestLoggingInterceptor, ResponseLoggingInterceptor)
+  interceptorTest() {
+    console.log('🎯 コントローラー内の処理');
+    return {
+      message: 'インターセプターのライフサイクルテスト',
+      timestamp: new Date().toISOString(),
     };
   }
 
